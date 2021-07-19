@@ -16,6 +16,10 @@ headers_more_nginx_module_url=https://github.com/openresty/headers-more-nginx-mo
 uuid4_url=https://github.com/cybozu/nginx-uuid4-module/archive/${UUID4_VERSION}.tar.gz
 zlib_url=http://zlib.net/zlib-${ZLIB_VERSION}.tar.gz
 
+# https://web.dev/how-to-set-up-signed-http-exchanges/
+#sxg_url=https://github.com/google/nginx-sxg-module/releases/download/v0.1/libnginx-mod-http-sxg-filter_1.15.9-0ubuntu1.1_amd64.deb
+sxg_url=https://github.com/google/nginx-sxg-module
+
 temp_dir=$(mktemp -d /tmp/nginx.XXXXXXXXXX)
 
 cd $temp_dir
@@ -36,6 +40,10 @@ echo "Downloading $zlib_url"
 echo "Downloading $uuid4_url"
 (cd nginx-${NGINX_VERSION} && curl -L $uuid4_url | tar xvz )
 
+echo "Cloning $sxg_url"
+# curl -L $sxg_url | dpkg -i libnginx-mod-http-sxg-filter_1.15.9-0ubuntu1.1_amd64.deb
+git clone https://github.com/google/nginx-sxg-module
+
 # This will build `nginx`
 (
   cd nginx-${NGINX_VERSION}
@@ -45,9 +53,11 @@ echo "Downloading $uuid4_url"
     --with-http_gzip_static_module \
     --with-http_realip_module \
     --with-http_ssl_module \
+    --without-http_rewrite_module \
     --prefix=/tmp/nginx \
     --add-module=${temp_dir}/nginx-${NGINX_VERSION}/headers-more-nginx-module-${HEADERS_MORE_VERSION} \
-    --add-module=${temp_dir}/nginx-${NGINX_VERSION}/nginx-uuid4-module-${UUID4_VERSION}
+    --add-module=${temp_dir}/nginx-${NGINX_VERSION}/nginx-uuid4-module-${UUID4_VERSION} \
+    --add-dynamic-module=../nginx-sxg-module
   make install
 )
 
@@ -61,9 +71,11 @@ echo "Downloading $uuid4_url"
     --with-http_gzip_static_module \
     --with-http_realip_module \
     --with-http_ssl_module \
+    --without-http_rewrite_module \
     --prefix=/tmp/nginx-debug \
     --add-module=${temp_dir}/nginx-${NGINX_VERSION}/headers-more-nginx-module-${HEADERS_MORE_VERSION} \
-    --add-module=${temp_dir}/nginx-${NGINX_VERSION}/nginx-uuid4-module-${UUID4_VERSION}
+    --add-module=${temp_dir}/nginx-${NGINX_VERSION}/nginx-uuid4-module-${UUID4_VERSION} \
+    --add-dynamic-module=../nginx-sxg-module
   make install
 )
 
