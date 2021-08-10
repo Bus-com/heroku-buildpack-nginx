@@ -14,17 +14,6 @@ mkdir -p "$BUILD_DIR/bin/"
 mkdir -p "$BUILD_DIR/nginx"
 tar -zxvf "nginx-$STACK".tgz -C "$BUILD_DIR/nginx"
 
-echo "-----> nginx-buildpack: Installing libsxg"
-apt install -y libssl-dev
-wget https://github.com/google/libsxg/releases/download/v0.2/libsxg0_0.2-1_amd64.deb
-wget https://github.com/google/libsxg/releases/download/v0.2/libsxg-dev_0.2-1_amd64.deb
-dpkg -i libsxg0_0.2-1_amd64.deb
-dpkg -i libsxg-dev_0.2-1_amd64.deb
-
-echo "-----> nginx-buildpack: Installing libnginx-mod-http-sxg-filter"
-wget https://github.com/google/nginx-sxg-module/releases/download/v0.1/libnginx-mod-http-sxg-filter_1.15.9-0ubuntu1.1_amd64.deb
-dpkg -i libnginx-mod-http-sxg-filter_1.15.9-0ubuntu1.1_amd64.deb
-
 cp "$BUILD_DIR/nginx/nginx" "$BUILD_DIR/bin/nginx"
 cp "$BUILD_DIR/nginx/nginx-debug" "$BUILD_DIR/bin/nginx-debug"
 
