@@ -36,18 +36,21 @@ echo "Downloading $zlib_url"
 echo "Downloading $uuid4_url"
 (cd nginx-${NGINX_VERSION} && curl -L $uuid4_url | tar xvz )
 
-echo "Downloading libsxg"
+echo "Cloning nginx-sxg-module"
+git clone https://github.com/google/nginx-sxg-module
+
+echo "Cloning libsxg"
 git clone https://github.com/google/libsxg
 mkdir libsxg/build
 cd libsxg/build
+
+echo "Installing libsxg"
 cmake .. -DRUN_TEST=false -DCMAKE_BUILD_TYPE=Release
 make
 make install
-
-git clone https://github.com/google/nginx-sxg-module
-
 cd ..
 
+echo "Building nginx"
 # This will build `nginx`
 (
   cd nginx-${NGINX_VERSION}
