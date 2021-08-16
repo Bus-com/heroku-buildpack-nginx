@@ -3,6 +3,12 @@
 # This script is designed to run in a Heroku Stack Docker
 # image. More information on the Heroku Stack can be found
 # at https://devcenter.heroku.com/articles/stack
+set -o errexit -o nounset -o noclobber -o pipefail
+
+clear
+
+BCyan='\033[1;36m' # Cyan
+CReset='\033[m' # reset color
 
 NGINX_VERSION=${NGINX_VERSION-1.20.1}
 PCRE_VERSION=${PCRE_VERSION-8.44}
@@ -19,75 +25,107 @@ zlib_url=http://zlib.net/zlib-${ZLIB_VERSION}.tar.gz
 temp_dir=$(mktemp -d /tmp/nginx.XXXXXXXXXX)
 
 cd $temp_dir
-echo "Temp dir: $temp_dir"
+echo -e "\n$BCyan=====> Temp dir: $temp_dir  $CReset"
 
-echo "Downloading $nginx_tarball_url"
-curl -L $nginx_tarball_url | tar xzv
+echo -e "\n$BCyan=====> Downloading $nginx_tarball_url $CReset"
+curl -L $nginx_tarball_url | tar xz
 
-echo "Downloading $pcre_tarball_url"
-(cd nginx-${NGINX_VERSION} && curl -L $pcre_tarball_url | tar xvz )
+echo -e "\n$BCyan=====> Downloading $pcre_tarball_url $CReset"
+(cd nginx-${NGINX_VERSION} && curl -L $pcre_tarball_url | tar xz )
 
-echo "Downloading $headers_more_nginx_module_url"
-(cd nginx-${NGINX_VERSION} && curl -L $headers_more_nginx_module_url | tar xvz )
+echo -e "\n$BCyan=====> Downloading $headers_more_nginx_module_url $CReset"
+(cd nginx-${NGINX_VERSION} && curl -L $headers_more_nginx_module_url | tar xz )
 
-echo "Downloading $zlib_url"
-(cd nginx-${NGINX_VERSION} && curl -L $zlib_url | tar xvz )
+echo -e "\n$BCyan=====> Downloading $zlib_url $CReset"
+(cd nginx-${NGINX_VERSION} && curl -L $zlib_url | tar xz )
 
-echo "Downloading $uuid4_url"
-(cd nginx-${NGINX_VERSION} && curl -L $uuid4_url | tar xvz )
+echo -e "\n$BCyan=====> Downloading $uuid4_url $CReset"
+(cd nginx-${NGINX_VERSION} && curl -L $uuid4_url | tar xz )
 
-echo "Cloning nginx-sxg-module"
+echo -e "\n$BCyan=====> Cloning nginx-sxg-module $CReset"
 git clone https://github.com/google/nginx-sxg-module
 
-echo "Cloning libsxg"
+echo "ngx_module_incs=$temp_dir/include" >> nginx-sxg-module/config
+sed -i -e "s|-L/usr/local/lib|-L$temp_dir/lib|g" nginx-sxg-module/config
+cat nginx-sxg-module/config
+
+echo -e "\n$BCyan=====> Cloning libsxg $CReset"
 git clone https://github.com/google/libsxg
 mkdir libsxg/build
 cd libsxg/build
 
-echo "Installing libsxg"
-cmake .. -DRUN_TEST=false -DCMAKE_BUILD_TYPE=Release
+echo -e "\n$BCyan=====> Installing libsxg $CReset"
+cmake .. -DRUN_TEST=false -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=$temp_dir/lib -DCMAKE_INSTALL_BINDIR=$temp_dir/bin -DCMAKE_INSTALL_PREFIX=$temp_dir
 make
 make install
-cd ..
+cd ../..
 
-echo "Building nginx"
-# This will build `nginx`
+export INCLUDE_PATH="$temp_dir/"
+export LIBRARY_PATH="$temp_dir/"
+export LD_LIBRARY_PATH="$temp_dir/"
+export C_INCLUDE_PATH="$temp_dir/"
+
+echo -e "\n$BCyan=====> Paths $CReset"
+echo $INCLUDE_PATH
+echo $LIBRARY_PATH
+echo $LD_LIBRARY_PATH
+
+echo -e "\n$BCyan=====> Building nginx $CReset"
 (
   cd nginx-${NGINX_VERSION}
-  ./configure \
+  LD_LIBRARY_PATH="$temp_dir/lib" ./configure \
     --with-pcre=pcre-${PCRE_VERSION} \
     --with-zlib=zlib-${ZLIB_VERSION} \
     --with-http_gzip_static_module \
     --with-http_realip_module \
     --with-http_ssl_module \
-    --prefix=/tmp/nginx \
     --add-dynamic-module=../nginx-sxg-module \
+    --prefix=/tmp/nginx \
+    --with-ld-opt="-L $temp_dir/lib" \
+    --with-cc-opt="-I $temp_dir/include" \
     --add-module=${temp_dir}/nginx-${NGINX_VERSION}/headers-more-nginx-module-${HEADERS_MORE_VERSION} \
     --add-module=${temp_dir}/nginx-${NGINX_VERSION}/nginx-uuid4-module-${UUID4_VERSION}
   make
   make install
 )
 
-# This will build `nginx-debug`
+echo -e "\n$BCyan=====> Building nginx-debug $CReset"
 (
   cd nginx-${NGINX_VERSION}
-  ./configure \
-    --with-debug \
+  LD_LIBRARY_PATH="$temp_dir/lib" ./configure \
     --with-pcre=pcre-${PCRE_VERSION} \
+    --with-debug \
     --with-zlib=zlib-${ZLIB_VERSION} \
     --with-http_gzip_static_module \
     --with-http_realip_module \
     --with-http_ssl_module \
+    --add-dynamic-module=../nginx-sxg-module \
     --prefix=/tmp/nginx-debug \
+    --with-ld-opt="-L $temp_dir/lib" \
+    --with-cc-opt="-I $temp_dir/include" \
     --add-module=${temp_dir}/nginx-${NGINX_VERSION}/headers-more-nginx-module-${HEADERS_MORE_VERSION} \
     --add-module=${temp_dir}/nginx-${NGINX_VERSION}/nginx-uuid4-module-${UUID4_VERSION}
   make install
 )
 
+echo -e "\n$BCyan=====> Releasing $CReset"
 release_dir=$(mktemp -d /tmp/nginx.XXXXXXXXXX)
 
 cp /tmp/nginx/sbin/nginx $release_dir/nginx
 cp /tmp/nginx-debug/sbin/nginx $release_dir/nginx-debug
 cp /tmp/nginx/conf/mime.types $release_dir/mime.types
+
+# move lib/bin
+mkdir $release_dir/lib
+cp $temp_dir/lib/libsxg.* $release_dir/lib
+cp -r $temp_dir/include/libsxg/ $release_dir/include/
+cp $temp_dir/bin/gensxg $release_dir/bin
+cp $temp_dir/bin/gencertchain $release_dir/bin
+
+# move .so
+mkdir $release_dir/modules
+cp /tmp/nginx/modules/ngx_http_sxg_filter_module.so $release_dir/modules/ngx_http_sxg_filter_module.so
+
 tar -zcvf /tmp/nginx-"${STACK}".tgz -C $release_dir .
+
 cp /tmp/nginx-"${STACK}".tgz $1

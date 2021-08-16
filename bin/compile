@@ -10,12 +10,20 @@ BUILD_DIR=$1
 CACHE_DIR=$2
 BUILDPACK_DIR="$(dirname "$(dirname "$0")")"
 
-mkdir -p "$BUILD_DIR/bin/"
+#mkdir -p "$BUILD_DIR/bin/modules"
 mkdir -p "$BUILD_DIR/nginx"
 tar -zxvf "nginx-$STACK".tgz -C "$BUILD_DIR/nginx"
 
+echo -e '\n-----> nginx-buildpack: Added modules and libs to app/bin'
+ls -al "$BUILD_DIR/nginx"
+
 cp "$BUILD_DIR/nginx/nginx" "$BUILD_DIR/bin/nginx"
 cp "$BUILD_DIR/nginx/nginx-debug" "$BUILD_DIR/bin/nginx-debug"
+
+cp -r "$BUILD_DIR/nginx/lib" "$BUILD_DIR/bin/lib"
+cp -r "$BUILD_DIR/nginx/include" "$BUILD_DIR/bin/include"
+cp -r "$BUILD_DIR/nginx/modules" "$BUILD_DIR/bin/modules"
+echo '-----> nginx-buildpack: Added modules and libs to app/bin'
 
 nginx_version=$($BUILD_DIR/bin/nginx -V 2>&1 | head -1 | awk '{ print $NF }')
 echo "-----> nginx-buildpack: Installed ${nginx_version} to app/bin"
